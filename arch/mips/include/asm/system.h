@@ -21,6 +21,7 @@
 #if 0
 #include <linux/kernel.h>
 #endif
+#include <asm/asm.h>
 
 extern __inline__ void
 __sti(void)
@@ -29,10 +30,12 @@ __sti(void)
 		".set\tpush\n\t"
 		".set\treorder\n\t"
 		".set\tnoat\n\t"
+		PS2_SYNC
 		"mfc0\t$1,$12\n\t"
 		"ori\t$1,0x1f\n\t"
 		"xori\t$1,0x1e\n\t"
 		"mtc0\t$1,$12\n\t"
+		PS2_SYNC
 		".set\tpop\n\t"
 		: /* no outputs */
 		: /* no inputs */
@@ -53,11 +56,13 @@ __cli(void)
 		".set\tpush\n\t"
 		".set\treorder\n\t"
 		".set\tnoat\n\t"
+		PS2_SYNC
 		"mfc0\t$1,$12\n\t"
 		"ori\t$1,1\n\t"
 		"xori\t$1,1\n\t"
 		".set\tnoreorder\n\t"
 		"mtc0\t$1,$12\n\t"
+		PS2_SYNC
 		"nop\n\t"
 		"nop\n\t"
 		"nop\n\t"
@@ -71,6 +76,7 @@ __cli(void)
 __asm__ __volatile__(							\
 	".set\tpush\n\t"						\
 	".set\treorder\n\t"						\
+	PS2_SYNC							\
 	"mfc0\t%0,$12\n\t"						\
 	".set\tpop\n\t"							\
 	: "=r" (x))
@@ -80,11 +86,13 @@ __asm__ __volatile__(							\
 	".set\tpush\n\t"						\
 	".set\treorder\n\t"						\
 	".set\tnoat\n\t"						\
+	PS2_SYNC							\
 	"mfc0\t%0,$12\n\t"						\
 	"ori\t$1,%0,1\n\t"						\
 	"xori\t$1,1\n\t"						\
 	".set\tnoreorder\n\t"						\
 	"mtc0\t$1,$12\n\t"						\
+	PS2_SYNC							\
 	"nop\n\t"							\
 	"nop\n\t"							\
 	"nop\n\t"							\
@@ -100,12 +108,14 @@ do {									\
 	__asm__ __volatile__(						\
 		".set\tnoreorder\t\t\t# __restore_flags\n\t"		\
 		".set\tnoat\n\t"					\
+		PS2_SYNC						\
 		"mfc0\t$1, $12\n\t"					\
 		"andi\t%0, 1\n\t"					\
 		"ori\t$1, 1\n\t"					\
 		"xori\t$1, 1\n\t"					\
 		"or\t%0, $1\n\t"					\
 		"mtc0\t%0, $12\n\t"					\
+		PS2_SYNC						\
 		"nop\n\t"						\
 		"nop\n\t"						\
 		"nop\n\t"						\

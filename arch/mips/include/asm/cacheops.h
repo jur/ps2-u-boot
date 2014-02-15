@@ -82,4 +82,14 @@
 #define INDEX_STORE_DATA_D	0x1d
 #define INDEX_STORE_DATA_S	0x1f
 
+/*
+ * R5900-specific cacheops
+ */
+#define R5900_HIT_WRITEBACK_INV_D	0x18
+#define R5900_HIT_INVALIDATE_I		0x0b
+#define R5900_INDEX_STORE_TAG_I		0x04
+#define R5900_INDEX_STORE_TAG_D		0x12
+#define R5900_FILL			0x0e
+#define R5900_HIT_INVALIDATE_D		0x1a
+
 #endif	/* __ASM_CACHEOPS_H */

@@ -13,6 +13,8 @@
 #ifndef _ASM_MIPSREGS_H
 #define _ASM_MIPSREGS_H
 
+#include <asm/asm.h>
+
 #if 0
 #include <linux/linkage.h>
 #endif
@@ -413,8 +415,10 @@
 #define CONF_CU			(_ULCAST_(1) <<  3)
 #define CONF_DB			(_ULCAST_(1) <<  4)
 #define CONF_IB			(_ULCAST_(1) <<  5)
-#define CONF_DC			(_ULCAST_(7) <<  6)
-#define CONF_IC			(_ULCAST_(7) <<  9)
+#define CONF_DC_SHIFT		6
+#define CONF_DC			(_ULCAST_(7) <<  CONF_DC_SHIFT)
+#define CONF_IC_SHIFT		9
+#define CONF_IC			(_ULCAST_(7) <<  CONF_IC_SHIFT)
 #define CONF_EB			(_ULCAST_(1) << 13)
 #define CONF_EM			(_ULCAST_(1) << 14)
 #define CONF_SM			(_ULCAST_(1) << 16)
@@ -597,6 +601,7 @@ do {								\
 ({ int __res;								\
 	if (sel == 0)							\
 		__asm__ __volatile__(					\
+			PS2_SYNC					\
 			"mfc0\t%0, " #source "\n\t"			\
 			: "=r" (__res));				\
 	else								\
@@ -632,6 +637,7 @@ do {									\
 	if (sel == 0)							\
 		__asm__ __volatile__(					\
 			"mtc0\t%z0, " #register "\n\t"			\
+			PS2_SYNC					\
 			: : "Jr" ((unsigned int)(value)));		\
 	else								\
 		__asm__ __volatile__(					\
@@ -1260,7 +1266,9 @@ static inline void tlb_probe(void)
 {
 	__asm__ __volatile__(
 		".set noreorder\n\t"
+		PS2_SYNC
 		"tlbp\n\t"
+		PS2_SYNC
 		".set reorder");
 }
 
@@ -1285,7 +1293,9 @@ static inline void tlb_read(void)
 
 	__asm__ __volatile__(
 		".set noreorder\n\t"
+		PS2_SYNC
 		"tlbr\n\t"
+		PS2_SYNC
 		".set reorder");
 
 #if MIPS34K_MISSED_ITLB_WAR
@@ -1305,7 +1315,9 @@ static inline void tlb_write_indexed(void)
 {
 	__asm__ __volatile__(
 		".set noreorder\n\t"
+		PS2_SYNC
 		"tlbwi\n\t"
+		PS2_SYNC
 		".set reorder");
 }
 
@@ -1313,7 +1325,9 @@ static inline void tlb_write_random(void)
 {
 	__asm__ __volatile__(
 		".set noreorder\n\t"
+		PS2_SYNC
 		"tlbwr\n\t"
+		PS2_SYNC
 		".set reorder");
 }
 

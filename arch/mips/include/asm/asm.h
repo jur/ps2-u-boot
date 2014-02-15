@@ -396,6 +396,13 @@ symbol		=	value
 #define MTC0		dmtc0
 #endif
 
+#ifdef CONFIG_PS2
+#define PS2_SYNC "sync.p\n\t"
+#else
+#define PS2_SYNC
+#endif
+
+
 #define SSNOP		sll zero, zero, 1
 
 #ifdef CONFIG_SGI_IP28
