@@ -67,6 +67,10 @@ int sbios(int sbcall, void *arg);
 
 #define SBIOS_VERSION	0x0257
 
+#define SIF_RPCE_GETP	1	/* failed to get packet data. */
+#define SIF_RPCE_SENDP	2	/* failed to send dma packet. */
+#define E_SIF_PKT_ALLOC	0xd610	/* Can't allocate SIF packet. */
+
 #define SB_GETVER		0
 #define SB_HALT			1
 struct sb_halt_arg {

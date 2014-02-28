@@ -59,9 +59,16 @@
 #define EE_SIO_TXFIFO 0x1000f180
 #define EE_SIO_RXFIFO 0x1000f1c0
 
+#define EE_DMAC_SIF0_CHCR 0x1000c000
+#define CHCR_STR 0x0100
+
 #define SBIOS_BASE	0x80001000
 #define SBIOS_MAGIC	0x80001004
 #define SBIOS_MAGICVAL	0x62325350
+
+/* Base address for IOP memory. */
+#define PS2_IOP_HEAP_BASE 0x1c000000
+#define PS2_IOP_HEAP_END  0x20000000
 
 static struct ps2_bootinfo bootinfo;
 
@@ -71,7 +78,12 @@ static int sbversion = 0;
 int sbios(int func, void *arg)
 {
 	if (_sbios == NULL) {
-		return -1;
+		extern void _start(void);
+		error("SBIOS not found\n");
+		/* TBD: Is data segment lost after reloc? */
+		_sbios = *(int (**)(int, void *))(SBIOS_BASE); // TBD
+		error("_start func at 0x%08x\n", (unsigned int) _start);
+		/* TBD: return -1; */
 	}
 	return _sbios(func, arg);
 }
@@ -79,6 +91,109 @@ int sbios(int func, void *arg)
 phys_size_t initdram(int board_type)
 {
 	return CONFIG_SYS_MEM_SIZE;
+}
+
+static void check_sif_irq(void)
+{
+	if (inl(EE_DMAC_SIF0_CHCR) & CHCR_STR) {
+		/* DMA not finished, no interrupt. */
+		return;
+	}
+
+	/* Emulate interrupt. */
+	sbios(SB_SIFCMDINTRHDLR, NULL);
+}
+
+static void rpc_wakeup(void *p, int result)
+{
+	volatile int *woken;
+
+	woken = (int *) p;
+	*woken = 1;
+}
+
+static int sbios_rpc(int func, void *arg, int *result)
+{
+	int ret;
+	struct sbr_common_arg carg;
+	volatile int woken = 0;
+
+	carg.arg = arg;
+	carg.func = rpc_wakeup;
+	carg.para = (void *) &woken;
+	carg.result = -1;
+
+	do {
+		debug("Call SBIOS %d\n", func);
+		ret = sbios(func, &carg);
+		debug("ret = %d\n", ret);
+		switch (ret) {
+			case 0:
+				break;
+			case -SIF_RPCE_SENDP:
+				/* resource temporarily unavailable */
+
+				/* Time to check for interrupts. */
+				check_sif_irq();
+				break;
+			default:
+				*result = ret;
+				error("sbios_rpc: RPC failed, func=%d result=%d\n", func, ret);
+				return ret;
+		}
+	} while (ret < 0);
+
+	while(woken == 0) {
+		debug("check_sif_irq\n");
+
+		/* Time to check for interrupts. */
+		check_sif_irq();
+	}
+	debug("carg.result %d\n", carg.result);
+
+	*result = carg.result;
+
+	return 0;
+}
+
+static void driver_init(void)
+{
+	int rv;
+	int result;
+
+	rv = sbios(SB_SIFINIT, NULL);
+	if (rv < 0) {
+		error("SB_SIFINIT failed rv = %d\n", rv);
+		return;
+	}
+
+	rv = sbios(SB_SIFINITCMD, NULL);
+	if (rv < 0) {
+		error("SB_SIFINITCMD failed rv = %d\n", rv);
+		return;
+	}
+
+	rv = sbios(SB_SIFINITRPC, NULL);
+	if (rv < 0) {
+		error("SB_SIFINITRPC failed rv = %d\n", rv);
+		return;
+	}
+
+	for (;;) {
+		debug("Call SBR_IOPH_INIT\n");
+		rv = sbios_rpc(SBR_IOPH_INIT, NULL, &result);
+		debug("rv = %d\n", rv);
+		if (rv < 0) {
+			error("SBR_IOPH_INIT failed rv = %d\n", rv);
+			return;
+		}
+		debug("result = %d\n", result);
+		if (result == 0) {
+			/* Success */
+			break;
+		}
+	}
+	debug("SBIOS drivers successfully initialized.\n");
 }
 
 int checkboard(void)
@@ -105,6 +220,8 @@ int checkboard(void)
 
 	sbversion = sbios(SB_GETVER, NULL);
 	printf("SBIOS Version 0x%08x\n", sbversion);
+
+	driver_init();
 	return 0;
 }
 
@@ -117,13 +234,9 @@ int board_eth_init(bd_t *bis)
 void _machine_restart(void)
 {
 	struct sb_halt_arg arg;
-	/* TBD */
 
-	puts("_machine_restart\n");
-	arg.mode = SB_HALT_MODE_RESTART;
 	arg.mode = SB_HALT_MODE_PWROFF;
 	sbios(SB_HALT, &arg);
-	puts("_machine_restart 2\n");
 }
 
 int board_early_init_f(void)
@@ -215,4 +328,67 @@ int rtc_set (struct rtc_time *tmp)
 {
 	/* TBD */
 	return 0;
+}
+
+/** Allocate bus address. Returns 0 on error. */
+uint32_t ps2sif_allociopheap(int size)
+{
+	struct sbr_ioph_alloc_arg arg;
+	int result;
+	int err;
+
+	arg.size = size;
+	err = sbios_rpc(SBR_IOPH_ALLOC, &arg, &result);
+
+	if (err < 0) {
+		return 0;
+	}
+	return result;
+}
+
+int ps2sif_freeiopheap(uint32_t busaddr)
+{
+	struct sbr_ioph_free_arg arg;
+	int result;
+	int err;
+
+	arg.addr = busaddr;
+	err = sbios_rpc(SBR_IOPH_FREE, &arg, &result);
+
+	if (err < 0) {
+		return -1;
+	}
+	return result;
+}
+
+uint32_t ps2sif_phystobus(uint32_t physaddr)
+{
+	if (physaddr <= PS2_IOP_HEAP_BASE) {
+		error("Bad physical address 0x%08x used\n",
+			physaddr);
+	}
+	if (physaddr >= PS2_IOP_HEAP_END) {
+		error("Bad physical address 0x%08x used\n",
+			physaddr);
+	}
+	return (physaddr - PS2_IOP_HEAP_BASE);
+}
+
+/** Converts iopheap bus addr to phys addr for use with inl() and outl(). */
+uint32_t ps2sif_bustophys(uint32_t busaddr)
+{
+	uint32_t physaddr;
+
+	assert(busaddr != 0);
+
+	physaddr = busaddr + PS2_IOP_HEAP_BASE;
+	if (physaddr < PS2_IOP_HEAP_BASE) {
+		error("Bad bus address 0x%08x used\n",
+			busaddr);
+	}
+	if (physaddr >= PS2_IOP_HEAP_END) {
+		error("Bad bus address 0x%08x used\n",
+			busaddr);
+	}
+	return physaddr;
 }
