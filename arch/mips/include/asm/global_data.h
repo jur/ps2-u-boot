@@ -20,6 +20,10 @@ struct arch_global_data {
 	unsigned long tbl;
 	unsigned long lastinc;
 #endif
+#ifdef CONFIG_PS2
+	int (*_sbios)(int, void *);
+#endif
+
 };
 
 #include <asm-generic/global_data.h>

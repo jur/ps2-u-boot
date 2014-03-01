@@ -17,6 +17,7 @@
 #include <errno.h>
 #include <fat.h>
 #include <mmc.h>
+#include <usb.h>
 
 char *env_name_spec = "FAT";
 
@@ -64,6 +65,16 @@ int saveenv(void)
 		mmc_init(mmc);
 	}
 #endif /* CONFIG_MMC */
+#ifdef CONFIG_CMD_USB
+	if (strcmp(FAT_ENV_INTERFACE, "usb") == 0) {
+		if (usb_init() >= 0) {
+#ifdef CONFIG_USB_STORAGE
+			/* try to recognize storage devices immediately */
+			usb_stor_scan(1);
+#endif
+		}
+	}
+#endif /* CONFIG_CMD_USB */
 
 	dev_desc = get_dev(FAT_ENV_INTERFACE, dev);
 	if (dev_desc == NULL) {
@@ -94,11 +105,14 @@ int saveenv(void)
 
 void env_relocate_spec(void)
 {
-	char buf[CONFIG_ENV_SIZE];
+	static uchar buffer[CONFIG_ENV_SIZE + ARCH_DMA_MINALIGN];
+	uchar *buf;
 	block_dev_desc_t *dev_desc = NULL;
 	int dev = FAT_ENV_DEVICE;
 	int part = FAT_ENV_PART;
 	int err;
+
+	buf = (void *) (((unsigned long) buffer) & ~(ARCH_DMA_MINALIGN - 1));
 
 #ifdef CONFIG_MMC
 	if (strcmp(FAT_ENV_INTERFACE, "mmc") == 0) {
@@ -114,6 +128,16 @@ void env_relocate_spec(void)
 		mmc_init(mmc);
 	}
 #endif /* CONFIG_MMC */
+#ifdef CONFIG_CMD_USB
+	if (strcmp(FAT_ENV_INTERFACE, "usb") == 0) {
+		if (usb_init() >= 0) {
+#ifdef CONFIG_USB_STORAGE
+			/* try to recognize storage devices immediately */
+			usb_stor_scan(1);
+#endif
+		}
+	}
+#endif /* CONFIG_CMD_USB */
 
 	dev_desc = get_dev(FAT_ENV_INTERFACE, dev);
 	if (dev_desc == NULL) {
@@ -131,13 +155,19 @@ void env_relocate_spec(void)
 		return;
 	}
 
-	err = file_fat_read(FAT_ENV_FILE, (uchar *)&buf, CONFIG_ENV_SIZE);
+	err = file_fat_read(FAT_ENV_FILE, buf, CONFIG_ENV_SIZE);
 	if (err == -1) {
 		printf("\n** Unable to read \"%s\" from %s%d:%d **\n",
 			FAT_ENV_FILE, FAT_ENV_INTERFACE, dev, part);
 		set_default_env(NULL);
 		return;
 	}
+
+#ifdef CONFIG_CMD_USB
+	if (strcmp(FAT_ENV_INTERFACE, "usb") == 0) {
+		usb_stop();
+	}
+#endif /* CONFIG_CMD_USB */
 
 	env_import(buf, 1);
 }

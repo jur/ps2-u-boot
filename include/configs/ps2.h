@@ -10,10 +10,30 @@
 #include <asm/addrspace.h>
 #include <asm/ps2.h>
 
+//#define DEBUG 1
+
 /*
  * System configuration
  */
 #define CONFIG_PS2
+
+/*
+ * Only interrupt autoboot if <space> is pressed. Otherwise, garbage
+ * data on the serial line may interrupt the boot sequence.
+ */
+#define CONFIG_BOOTDELAY		3
+#define CONFIG_AUTOBOOT
+#define CONFIG_AUTOBOOT_KEYED
+#define CONFIG_AUTOBOOT_PROMPT				\
+	"Press SPACE to abort autoboot in %d seconds\n", bootdelay
+#define CONFIG_AUTOBOOT_DELAY_STR	"d"
+#define CONFIG_AUTOBOOT_STOP_STR	" "
+
+#define CONFIG_BOOTCOMMAND \
+	"usb start;" \
+	"fatload usb 0:1 0x80100000 /ps2/kernel.elf;" \
+	"usb stop;" \
+	"bootelf 0x80100000"
 
 #define CONFIG_MEMSIZE_IN_BYTES
 
@@ -30,7 +50,8 @@
 #define CONFIG_SYS_MONITOR_BASE		CONFIG_SYS_TEXT_BASE
 
 #define CONFIG_SYS_SDRAM_BASE		0x80000000 /* Cached addr */
-#define CONFIG_SYS_MEM_SIZE		(32 * 1024 * 1024)
+/** Memory size 32MiB, last page is reserved for bootinfo. */
+#define CONFIG_SYS_MEM_SIZE		(32 * 1024 * 1024 - 4096)
 
 #define CONFIG_SYS_INIT_SP_OFFSET	0x400000
 
@@ -66,10 +87,19 @@
  * Environment
  */
 #define CONFIG_SYS_NO_FLASH
+#if 0
 #define CONFIG_ENV_IS_IN_NVRAM
 /* TBD: Store U-Boot environment on MC0. */
 #define CONFIG_ENV_ADDR 0x81000000
-#define CONFIG_ENV_SIZE 0x00001000
+#else
+#define CONFIG_ENV_IS_IN_FAT
+#define FAT_ENV_INTERFACE "usb"
+#define FAT_ENV_DEVICE 0
+#define FAT_ENV_PART 1
+#define FAT_ENV_FILE "u-boot.cfg"
+#define CONFIG_FAT_WRITE
+#endif
+#define CONFIG_ENV_SIZE 0x00002000
 
 /*
  * Commands
@@ -90,7 +120,6 @@
 #define CONFIG_SUPPORT_VFAT
 
 #define CONFIG_CMD_USB
-//#define DEBUG 1
 
 #define CONFIG_SYS_LONGHELP		/* verbose help, undef to save memory */
 

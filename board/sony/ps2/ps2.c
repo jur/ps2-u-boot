@@ -12,6 +12,7 @@
 #include <asm/addrspace.h>
 #include <asm/io.h>
 #include <asm/ps2.h>
+#include <asm/global_data.h>
 
 #include "bootinfo.h"
 #include "sbios.h"
@@ -70,22 +71,15 @@
 #define PS2_IOP_HEAP_BASE 0x1c000000
 #define PS2_IOP_HEAP_END  0x20000000
 
-static struct ps2_bootinfo bootinfo;
-
-static int (*_sbios)(int, void *) = NULL;
-static int sbversion = 0;
+DECLARE_GLOBAL_DATA_PTR;
 
 int sbios(int func, void *arg)
 {
-	if (_sbios == NULL) {
-		extern void _start(void);
+	if (gd->arch._sbios == NULL) {
 		error("SBIOS not found\n");
-		/* TBD: Is data segment lost after reloc? */
-		_sbios = *(int (**)(int, void *))(SBIOS_BASE); // TBD
-		error("_start func at 0x%08x\n", (unsigned int) _start);
-		/* TBD: return -1; */
+		return -1;
 	}
-	return _sbios(func, arg);
+	return gd->arch._sbios(func, arg);
 }
 
 phys_size_t initdram(int board_type)
@@ -201,6 +195,8 @@ int checkboard(void)
 	struct ps2_bootinfo *info = (void *) CKSEG0ADDR(PS2_BOOTINFO_OLDADDR);
 	uint32_t size;
 	volatile uint32_t *sbios_magic;
+	int sbversion = 0;
+	struct ps2_bootinfo bootinfo;
 
 	puts("Board: Sony Playstation 2 MIPS r5900\n");
 	memset(&bootinfo, 0, sizeof(bootinfo));
@@ -210,13 +206,12 @@ int checkboard(void)
 	}
 	memcpy(&bootinfo, info, size);
 
-
 	sbios_magic = (uint32_t *) SBIOS_MAGIC;
 	if (*sbios_magic == SBIOS_MAGICVAL) {
-		_sbios = *(int (**)(int, void *))(SBIOS_BASE);
+		gd->arch._sbios = *(int (**)(int, void *))(SBIOS_BASE);
 	}
 	else
-		_sbios = NULL;
+		gd->arch._sbios = NULL;
 
 	sbversion = sbios(SB_GETVER, NULL);
 	printf("SBIOS Version 0x%08x\n", sbversion);
