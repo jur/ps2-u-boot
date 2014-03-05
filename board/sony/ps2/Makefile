@@ -4,4 +4,4 @@
 # SPDX-License-Identifier:	GPL-2.0+
 #
 
-obj-y	= ps2.o
+obj-y	= ps2.o sbios.o

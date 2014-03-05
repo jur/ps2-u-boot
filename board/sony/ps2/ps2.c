@@ -75,11 +75,13 @@ DECLARE_GLOBAL_DATA_PTR;
 
 int sbios(int func, void *arg)
 {
+	extern int sbios_call(int, void *, void *);
+
 	if (gd->arch._sbios == NULL) {
 		error("SBIOS not found\n");
 		return -1;
 	}
-	return gd->arch._sbios(func, arg);
+	return sbios_call(func, arg, gd->arch._sbios);
 }
 
 phys_size_t initdram(int board_type)
