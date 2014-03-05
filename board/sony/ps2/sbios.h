@@ -119,7 +119,23 @@ struct sb_sifdmastat_arg {
 	int id;
 };
 #define SB_SIFSETDCHAIN		20
-/* 21-23: reserved */
+#define SB_SIFSETREG		21
+enum _sif_regs {
+	 SIF_REG_MAINADDR = 1,
+	 SIF_REG_SUBADDR,
+	 SIF_REG_MSFLAG,
+	 SIF_REG_SMFLAG
+};
+
+typedef struct sb_sifsetreg {
+	u_int reg;
+	u_int val;
+};
+#define SB_SIFGETREG		22
+struct sb_sifgetreg {
+	u_int reg;
+};
+#define SB_SIFSTOPDMA		23
 
 /*
  *	SIF CMD services
