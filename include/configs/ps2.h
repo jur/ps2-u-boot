@@ -31,9 +31,9 @@
 
 #define CONFIG_BOOTCOMMAND \
 	"usb start;" \
-	"fatload usb 0:1 0x80100000 /ps2/kernel.elf;" \
+	"fatload usb 0:1 0x81000000 /ps2/vmlinux;" \
 	"usb stop;" \
-	"bootelf 0x80100000"
+	"bootelf 0x81000000"
 
 #define CONFIG_MEMSIZE_IN_BYTES
 
